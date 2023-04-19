@@ -7,7 +7,11 @@ public class ThreadedSetOff extends Thread{
 
     public void run(){
         synchronized(t) {
-            t.setOff();
+            try {
+                t.setOff();
+            } catch (java.lang.Exception e) {
+                System.err.println(t.toString() + e);
+            }
         }
     }
 }

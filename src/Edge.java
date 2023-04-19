@@ -38,6 +38,8 @@ public class Edge<T extends Node> {
     public T getDestination(){return destination;}
     public double getDistance(){return distance;}
 
+    public double getDistanceBetweenTwoStations(){return distanceBetweenTwoStations;}
+
     @Override
     public String toString(){
         return getPath().toString();

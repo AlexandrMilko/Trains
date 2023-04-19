@@ -1,8 +1,4 @@
 import java.lang.Math;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.ArrayList;
-import java.util.HashMap;
 public class Locomotive{
     private String name;
     private int id;
@@ -10,7 +6,8 @@ public class Locomotive{
     private final int maxRailroadCars = 10;
     private final double maxWeight = 6000;
     private final int maxECars = 3; // maximum quantity of electricity cars that can be connected
-    private double speed = 1000;
+    private double speed = 10; //per second
+    private double distanceGone;
 
     public Locomotive(String name){
         this.name = name;
@@ -34,53 +31,11 @@ public class Locomotive{
         else            speed = speed*(1 - percentage);
     }
 
-    private Station pickRandomStation(HashSet<Station> stations){
-        int size = stations.size();
-        int item = new Random().nextInt(size);
-        int i = 0;
-        for(Station s : stations)
-        {
-            if (i == item)
-                return s;
-            i++;
-        }
-        return null; // TODO remove null return
-    }
-
     @Override
-    public String toString(){
-        return name + id + "(" + journey.getStart() + " -> " + journey.getDestination() + ")";
-    }
-
-    public static ArrayList<Locomotive> generateRandomSet(int number, String name, HashSet<Station> stations, Graph<Station> stationsLayout){
-        ArrayList<Locomotive> locomotives = new ArrayList<>();
-        for(int i=0; i<number; ++i){
-            try {
-                Locomotive l = new Locomotive(name, stations, stationsLayout);
-                locomotives.add(l);
-            }
-            catch (EdgeNotFoundException e){
-                System.err.println(e);
-            }
-        }
-        return locomotives;
-    }
-
-    @Override
-    public void run(){ //This run just "performs" one iteration of the Locomotive move
-        try                                      {Thread.sleep(1000);}
-        catch (java.lang.InterruptedException e) {System.err.println(e);}
-        if(distanceGone < journey.getDistance())
-            distanceGone += speed * (period / 1000.);
+    public String toString(){ //TODO use StringBuilder?
+        return "Locomotive: " + name + id;
     }
     public double getDistanceGone(){return distanceGone;}
-    public void setOff(){
-        try {
-            System.out.println(this);
-            System.out.println(journey.getPath());
-            System.out.println();
-        }catch(EdgeNotFoundException e){
-            System.err.println(e);
-        }
-    }
+    public void increaseDistanceGone(){distanceGone += speed;}
+    public double getSpeed(){return speed;}
 }
