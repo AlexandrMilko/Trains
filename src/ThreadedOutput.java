@@ -1,4 +1,3 @@
-import java.io.IOException;
 import java.util.ArrayList;
 
 public class ThreadedOutput extends Thread{
@@ -12,14 +11,17 @@ public class ThreadedOutput extends Thread{
     @Override
     public void run(){
         synchronized (trains){
-            try {
-                while (true) {
+            while (true) {
+                try {
                     TrainSet.outputInfo(trains);
+                } catch (Exception e) {
+                    System.err.println(e);
+                    try {
+                        Thread.sleep(3000);
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
                 }
-            } catch (IOException e) {
-                System.err.println(e);
-            } catch (InterruptedException e) {
-                System.err.println(e);
             }
         }
     }

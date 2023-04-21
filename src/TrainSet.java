@@ -17,9 +17,13 @@ public class TrainSet {
     private static final ArrayList<TrainSet> allTrains = new ArrayList<>();
     private static final int outputUpdatePeriod = 3000;
     private static final int tickPeriod = 1000;
+    private static final int stopPeriod = 2000; //2s delay on the station
+    private static final int routeRetryPeriod = 30_000; //30s delay
+    private static final int ticksBeforeSpeedChange = 3; // one tick - one second
+    private static final int hazardSpeed = 200;
     private static final String outputFileName = "AppState.txt";
     private Locomotive locomotive;
-    private ArrayList<RailroadCar> rCars;
+    private ArrayList<RailroadCar> rCars = new ArrayList<>();
     private String name;
     private int id;
     private static int lastId = 0;
@@ -27,6 +31,16 @@ public class TrainSet {
     private Graph<Station> stationsLayout;
     private Station lastStation;
     private boolean isWaiting;
+    private boolean isWaitingForTrain; //using it for output formmating
+    private int secondsLeftToWait;
+
+
+    //Create TrainSet without defining journey
+    public TrainSet(String name){
+        this.name = name;
+        this.id = lastId ++;
+        allTrains.add(this);
+    }
 
     //Set journey on your own
     public TrainSet(String name, Edge<Station> journey, Graph<Station> stationsLayout){
@@ -41,23 +55,41 @@ public class TrainSet {
     public TrainSet(String name, HashSet<Station> stations, Graph<Station> stationsLayout){
         this.name = name;
         this.stationsLayout = stationsLayout;
-        Station start = pickRandomStation(stations);
-        Station destination = pickRandomStation(stations);
-        HashMap<Station, HashSet<Station>> adjacencyList = this.stationsLayout.getAdjacencyList();
-        this.journey = new Edge<Station>(start, destination, adjacencyList);
+        this.journey = generateRandomRoute(stations);
         this.id = lastId ++;
         allTrains.add(this);
     }
 
-    //TODO make a constructor with railroadcars and locomotive specified
+    private Edge<Station> generateRandomRoute(HashSet<Station> stations){
+        Station start = pickRandomStation(stations);
+        Station destination = pickRandomStation(stations);
+        HashMap<Station, HashSet<Station>> adjacencyList = this.stationsLayout.getAdjacencyList();
+        try {
+            Edge<Station> route = new Edge<Station>(start, destination, adjacencyList);
+            return route;
+        } catch (EdgeNotFoundException e){
+            return this.generateRandomRoute(stations);
+        }
+    }
+    private Edge<Station> generateRandomRoute(Station start, HashSet<Station> stations){
+        Station destination = pickRandomStation(stations);
+        HashMap<Station, HashSet<Station>> adjacencyList = this.stationsLayout.getAdjacencyList();
+        try {
+            Edge<Station> route = new Edge<Station>(start, destination, adjacencyList);
+            return route;
+        } catch (EdgeNotFoundException e){
+            return this.generateRandomRoute(start, stations);
+        }
+    }
 
+    //TODO make a constructor with railroadcars and locomotive specified
     public void randomlyChangeSpeed(){
         locomotive.randomlyChangeSpeed();
     }
+
     public void randomlyChangeSpeed(double percentage){
         locomotive.randomlyChangeSpeed(percentage);
     }
-
     private Station pickRandomStation(HashSet<Station> stations){
         int size = stations.size();
         int item = new Random().nextInt(size);
@@ -70,6 +102,8 @@ public class TrainSet {
         }
         return null; // TODO remove null return
     }
+
+    public void setStationsLayout(Graph<Station> graph){this.stationsLayout = graph;}
 
     @Override
     public String toString(){
@@ -97,6 +131,7 @@ public class TrainSet {
 
     public void setLocomotive(Locomotive l){this.locomotive = l;}
     public void setRailroadCars(ArrayList<RailroadCar> rCars){this.rCars = rCars;}
+    public void attachRailroadCar(RailroadCar rCar){this.rCars.add(rCar);}
 
     public double getDistanceGone(){return locomotive.getDistanceGone();}
 
@@ -110,21 +145,48 @@ public class TrainSet {
     }
 
     public void setOff() throws InterruptedException, IOException {
+        if(this.journey == null) this.journey = generateRandomRoute(stationsLayout.getStations());
         isWaiting = false;
+        isWaitingForTrain = false;
         Station start = journey.getStart();
         Station destination = journey.getDestination();
         lastStation = start;
-        int distanceGoneSinceLastStation;
+        double distanceGoneSinceLastStation;
 
         // Moving from start to the destination
         while(lastStation != destination){
             // Moving from one station to another
             distanceGoneSinceLastStation = 0;
+            int ticksCount = 0;
             while(distanceGoneSinceLastStation < journey.getDistanceBetweenTwoStations()){
                 Thread.sleep(tickPeriod);
-                distanceGoneSinceLastStation += locomotive.getSpeed();
-                locomotive.increaseDistanceGone();
+                ticksCount++;
+                if(ticksCount == ticksBeforeSpeedChange){
+                    locomotive.randomlyChangeSpeed();
+                    ticksCount=0;
+                }
+                if(distanceGoneSinceLastStation + locomotive.getSpeed() >= journey.getDistanceBetweenTwoStations()) {
+                    locomotive.increaseDistanceGone(journey.getDistanceBetweenTwoStations() - distanceGoneSinceLastStation);
+                    break; // We are already on the Station we were moving to
+                } else {
+                    distanceGoneSinceLastStation += locomotive.getSpeed();
+                    locomotive.increaseDistanceGone();
+                }
             }
+
+            //WAIT 30s before moving to the next station
+            isWaiting = true;
+            isWaitingForTrain = false;
+            int waited = 0;
+            while(waited < stopPeriod){
+                Thread.sleep(tickPeriod);
+                secondsLeftToWait = (stopPeriod - waited) / 1000;
+                waited += 1000;
+            }
+            isWaiting = false;
+            isWaitingForTrain = false;
+            secondsLeftToWait = 0;
+
             //Check if no trains are on the next railroad
             //If some is found, we stay on the station, waiting till it goes past.
             //TODO make it a sep function, make it synchronized?
@@ -134,13 +196,31 @@ public class TrainSet {
             else{
                 System.out.println(this.toString() + " TRAIN AHEAD!");
                 isWaiting = true;
+                isWaitingForTrain = true;
                 while(anyTrainsAhead()){
                     System.out.println(this.toString() + " WAITING");
                     Thread.sleep(1000);
                 }
+                lastStation = this.getNextStation();
                 isWaiting = false;
+                isWaitingForTrain = false;
             }
         }
+        //WAIT for 30 seconds before going with the next route
+        isWaiting = true;
+        isWaitingForTrain = false;
+        int waited = 0;
+        while(waited < routeRetryPeriod){
+            Thread.sleep(tickPeriod);
+            secondsLeftToWait = (routeRetryPeriod - waited) / 1000;
+            waited += 1000;
+        }
+        isWaiting = false;
+        isWaitingForTrain = false;
+        secondsLeftToWait = 0;
+        this.locomotive.clearDistance();
+        this.journey = generateRandomRoute(lastStation, stationsLayout.getStations());
+        this.setOff();
     }
 
     private Station getNextStation() throws NextStationNotFound{
@@ -163,13 +243,13 @@ public class TrainSet {
         }
     }
 
-    private void printInfo(){
-        String[] strings = {"_________ ", "| ##### | ", "|_#####_| ", "  o   o   "};
+    private void printInfo() throws RailroadHazardException{
+        String[] strings = {"_________ ", "| ######| ", "|_#####_| ", "  o   o   "};
         for(int i=0; i<strings.length; ++i) {
             StringBuilder sb = new StringBuilder();
             for (int j = 0; j < rCars.size(); ++j) {
                 if(i==1){
-                    sb.append(strings[i].replace("#####", String.format("%5s", rCars.get(j).getGoods().toString())));
+                    sb.append(strings[i].replace("######", String.format("%6s", rCars.get(j).getGoods().toString())));
                 }
                 else if(i==2) {
                     sb.append(strings[i].replace("#####", String.format("%5s", rCars.get(j).getClass().toString().replaceAll("\\P{Lu}", ""))));
@@ -195,13 +275,23 @@ public class TrainSet {
         System.out.println("% of the whole Distance completed: " + proportionComplete);
         double proportionCompleteSinceLastStation = 100 * (locomotive.getDistanceGone() % journey.getDistanceBetweenTwoStations()) / journey.getDistanceBetweenTwoStations();
         System.out.println("% of Distance completed since last Station: " + proportionCompleteSinceLastStation);
+        if(isWaitingForTrain) System.out.println("IS WAITING: " + isWaiting + "(UNKNOWN time left. Waiting for another train)");
+        else
+            if(isWaiting) System.out.println("IS WAITING: " + isWaiting + "("+secondsLeftToWait+"s left)");
+            else System.out.println("IS WAITING: " + isWaiting);
         System.out.println();
         System.out.println();
+        if (locomotive.getSpeed() > hazardSpeed)
+            throw new RailroadHazardException(this + ": Exceeded max speed!");
     }
-    public static void outputInfo(ArrayList<TrainSet> trains) throws IOException, InterruptedException {
+    public static void outputInfo(ArrayList<TrainSet> trains) throws IOException, InterruptedException, RailroadHazardException {
         for (TrainSet t : trains) {
             if (!t.wasPrinted) {
-                t.printInfo();
+                try {
+                    t.printInfo();
+                }catch (RailroadHazardException e){
+                    System.err.println(e);
+                }
                 t.wasPrinted = true;
             }
         }
@@ -215,7 +305,7 @@ public class TrainSet {
         }
     }
     private static boolean wereAllPrinted(ArrayList<TrainSet> trains){
-        for (TrainSet t : allTrains) {
+        for (TrainSet t : trains) {
             if(!t.wasPrinted) return false;
         }
         return true;
@@ -230,12 +320,12 @@ public class TrainSet {
         }
     }
     public void appendInfoToStream(PrintStream ps){
-        String[] strings = {"_________ ", "| ##### | ", "|_#####_| ", "  o   o   "};
+        String[] strings = {"_________ ", "| ######| ", "|_#####_| ", "  o   o   "};
         for(int i=0; i<strings.length; ++i) {
             StringBuilder sb = new StringBuilder();
             for (RailroadCar rCar : rCars) {
                 if (i == 1) {
-                    sb.append(strings[i].replace("#####", String.format("%5s", rCar.getGoods().toString())));
+                    sb.append(strings[i].replace("######", String.format("%6s", rCar.getGoods().toString())));
                 } else if (i == 2) {
                     sb.append(strings[i].replace("#####", String.format("%5s", rCar.getClass().toString().replaceAll("\\P{Lu}", ""))));
                 } else sb.append(strings[i]);
@@ -257,9 +347,15 @@ public class TrainSet {
         ps.println("Path: " + journey.getPath());
         double proportionComplete = 100 * ((locomotive.getDistanceGone() / (journey.getPath().size()*journey.getDistanceBetweenTwoStations())));
         ps.println("% of the whole Distance completed: " + proportionComplete);
-        double proportionCompleteSinceLastStation = 100 * (locomotive.getDistanceGone() % journey.getDistanceBetweenTwoStations()) / journey.getDistanceBetweenTwoStations();
+        double proportionCompleteSinceLastStation = Math.ceil(100 * (locomotive.getDistanceGone() % journey.getDistanceBetweenTwoStations()) / journey.getDistanceBetweenTwoStations());
         ps.println("% of Distance completed since last Station: " + proportionCompleteSinceLastStation);
+        if(isWaitingForTrain) ps.println("IS WAITING: " + isWaiting + "(UNKNOWN time left. Waiting for another train)");
+        else
+            if(isWaiting) ps.println("IS WAITING: " + isWaiting + "("+secondsLeftToWait+"s left)");
+            else ps.println("IS WAITING: " + isWaiting);
         ps.println();
         ps.println();
     }
+
+    public ArrayList<RailroadCar> getRCars(){return rCars;}
 }

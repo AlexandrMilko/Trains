@@ -3,8 +3,8 @@ public abstract class RailroadCar {
 
     private static int lastId = 0;
     private int id;
-    private double netWeight;
-    private double grossWeight;
+    double netWeight;
+    double grossWeight;
     public RailroadCar(){
         this.id = lastId++;
     }
@@ -19,6 +19,16 @@ public abstract class RailroadCar {
                 case BasicRailroadFreightCar -> {
                     LightGoods goods = LightGoods.pickRandomGoods();
                     rCar = new BasicRailroadFreightCar(goods);
+                    rCars.add(rCar);
+                }
+                case HeavyRailroadFreightCar -> {
+                    HeavyGoods goods = HeavyGoods.pickRandomGoods();
+                    rCar = new HeavyRailroadFreightCar(goods);
+                    rCars.add(rCar);
+                }
+                case PassengerRailroadCar -> {
+                    Passengers passengers = Passengers.pickRandomPassengers();
+                    rCar = new PassengerRailroadCar(passengers);
                     rCars.add(rCar);
                 }
             }

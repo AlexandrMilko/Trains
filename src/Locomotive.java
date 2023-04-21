@@ -4,9 +4,9 @@ public class Locomotive{
     private int id;
     private static int lastId = 0;
     private final int maxRailroadCars = 10;
-    private final double maxWeight = 6000;
+    private final double maxWeight = 150_000;
     private final int maxECars = 3; // maximum quantity of electricity cars that can be connected
-    private double speed = 10; //per second
+    private double speed = 199; //per second
     private double distanceGone;
 
     public Locomotive(String name){
@@ -19,6 +19,7 @@ public class Locomotive{
         double rand = Math.random();
         if (rand > 0.5) speed = speed*(1 + 0.03);
         else            speed = speed*(1 - 0.03);
+        if (speed < 0)  speed = 0;
     }
     public void randomlyChangeSpeed(double percentage){
 
@@ -29,6 +30,7 @@ public class Locomotive{
         double rand = Math.random();
         if (rand > 0.5) speed = speed*(1 + percentage);
         else            speed = speed*(1 - percentage);
+        if (speed < 0)  speed = 0;
     }
 
     @Override
@@ -37,5 +39,11 @@ public class Locomotive{
     }
     public double getDistanceGone(){return distanceGone;}
     public void increaseDistanceGone(){distanceGone += speed;}
+    public void increaseDistanceGone(double value){distanceGone += value;}
     public double getSpeed(){return speed;}
+    public void clearDistance(){distanceGone = 0;}
+
+    public int getMaxRailroadCars(){return maxRailroadCars;}
+    public int getMaxECars(){return maxECars;}
+    public double getMaxWeight(){return maxWeight;}
 }

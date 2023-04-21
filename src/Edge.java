@@ -5,7 +5,7 @@ public class Edge<T extends Node> {
     private T start;
     private T destination;
     private double distance;
-    private final double distanceBetweenTwoStations = 80;
+    private final double distanceBetweenTwoStations = 1500;
 
     public Edge(T start, T destination, HashMap<T, HashSet<T>> adjacencyList){
         LinkedList<T> currentPosition = new LinkedList<>();

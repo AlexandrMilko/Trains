@@ -2,8 +2,6 @@ public class BasicRailroadFreightCar extends RailroadCar {
 
     private int id;
     private static int lastId;
-    private final double netWeight;
-    private final double grossWeight;
     private final LightGoods goods;
 
     public BasicRailroadFreightCar(LightGoods goods){
@@ -23,7 +21,7 @@ public class BasicRailroadFreightCar extends RailroadCar {
         grossWeight = netWeight + 25_000;
     }
     public String toString(){
-        return "RCar" + id + " | "+ grossWeight + "kg";
+        return "BasicRailroadFreightCar" + id + " | "+ grossWeight + "kg";
     }
 
     public LightGoods getGoods(){
